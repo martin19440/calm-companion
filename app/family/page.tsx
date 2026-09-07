@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { loadSharedItems, saveSharedItems } from "../lib/shared-data-client";
 
 type FamilyContact = {
   id: string;
@@ -27,30 +28,12 @@ export default function FamilyPage() {
       return;
     }
 
-    const savedContacts = window.localStorage.getItem(STORAGE_KEY);
-    console.log("Reading from localStorage", { key: STORAGE_KEY, value: savedContacts });
-
-    if (!savedContacts) {
-      console.log("No saved contacts found. Starting with an empty list.");
-      setHasLoaded(true);
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(savedContacts) as FamilyContact[];
-      if (Array.isArray(parsed)) {
-        console.log("Loaded contacts from localStorage", parsed);
-        setContacts(parsed);
-      } else {
-        console.log("Stored value was not an array, clearing it.");
-        window.localStorage.removeItem(STORAGE_KEY);
-      }
-    } catch (error) {
-      console.log("Failed to parse localStorage data", error);
-      window.localStorage.removeItem(STORAGE_KEY);
-    } finally {
-      setHasLoaded(true);
-    }
+    loadSharedItems<FamilyContact>("family", STORAGE_KEY)
+      .then(setContacts)
+      .catch(() => undefined)
+      .finally(() => {
+        setHasLoaded(true);
+      });
   }, []);
 
   useEffect(() => {
@@ -58,9 +41,7 @@ export default function FamilyPage() {
       return;
     }
 
-    const serialized = JSON.stringify(contacts);
-    console.log("Writing to localStorage", { key: STORAGE_KEY, value: serialized });
-    window.localStorage.setItem(STORAGE_KEY, serialized);
+    void saveSharedItems("family", contacts);
   }, [contacts, hasLoaded]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -81,11 +62,7 @@ export default function FamilyPage() {
       phoneNumber,
     };
 
-    setContacts((currentContacts) => {
-      const updatedContacts = [newContact, ...currentContacts];
-      console.log("Adding contact and updating state", updatedContacts);
-      return updatedContacts;
-    });
+    setContacts((currentContacts) => [newContact, ...currentContacts]);
     setFormData({ firstName: "", relationship: "", phoneNumber: "" });
     setIsFormOpen(false);
   }
