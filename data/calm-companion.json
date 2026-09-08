@@ -29,6 +29,16 @@
   ],
   "routine": [
     {
+      "id": "1788826962175-28fa77acbb99d",
+      "text": "Have breakfast",
+      "completed": false
+    },
+    {
+      "id": "1788826134676-9d5bb039d1797",
+      "text": "Morning walk",
+      "completed": false
+    },
+    {
       "id": "1788771786956-ddd13065eefa08",
       "text": "Go for walk",
       "completed": false

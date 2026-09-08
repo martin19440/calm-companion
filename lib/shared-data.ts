@@ -7,6 +7,7 @@ type SharedData = Record<SharedResource, unknown[]>;
 
 const dataDirectory = path.join(process.cwd(), "data");
 const dataFile = path.join(dataDirectory, "calm-companion.json");
+let pendingWrite: Promise<void> = Promise.resolve();
 
 const emptyData: SharedData = {
   family: [],
@@ -40,26 +41,45 @@ async function writeSharedData(data: SharedData) {
   await writeFile(dataFile, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
+async function withWriteLock<T>(operation: () => Promise<T>) {
+  const previousWrite = pendingWrite;
+  let releaseWrite!: () => void;
+  pendingWrite = new Promise<void>((resolve) => {
+    releaseWrite = resolve;
+  });
+
+  await previousWrite;
+  try {
+    return await operation();
+  } finally {
+    releaseWrite();
+  }
+}
+
 export async function getSharedItems(resource: SharedResource) {
   const data = await readSharedData();
   return data[resource];
 }
 
 export async function replaceSharedItems(resource: SharedResource, items: unknown[]) {
-  const data = await readSharedData();
-  data[resource] = items;
-  await writeSharedData(data);
-  return items;
+  return withWriteLock(async () => {
+    const data = await readSharedData();
+    data[resource] = items;
+    await writeSharedData(data);
+    return items;
+  });
 }
 
 export async function migrateSharedItems(resource: SharedResource, items: unknown[]) {
-  const data = await readSharedData();
+  return withWriteLock(async () => {
+    const data = await readSharedData();
 
-  if (data[resource].length > 0) {
-    return data[resource];
-  }
+    if (data[resource].length > 0) {
+      return data[resource];
+    }
 
-  data[resource] = items;
-  await writeSharedData(data);
-  return items;
+    data[resource] = items;
+    await writeSharedData(data);
+    return items;
+  });
 }

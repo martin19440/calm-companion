@@ -39,6 +39,7 @@ export default function MedicationPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [formData, setFormData] = useState<MedicationFormState>(initialFormState);
+  const [remindersDelayedUntil, setRemindersDelayedUntil] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -87,18 +88,24 @@ export default function MedicationPage() {
     void saveSharedItems("medication", items);
   }, [hasLoaded, items]);
 
-  // Refresh `now` at midnight so "taken today" / overdue calculations reset automatically.
+  // Refresh the clock during the day and at midnight so status and reminders stay current.
   useEffect(() => {
-    const scheduleMidnightTick = () => {
-      const next = new Date();
-      next.setHours(24, 0, 0, 0);
-      const ms = next.getTime() - Date.now() + 50;
-      return setTimeout(() => setNow(new Date()), ms);
-    };
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
-    const timer = scheduleMidnightTick();
-    return () => clearTimeout(timer);
-  }, [now]);
+  useEffect(() => {
+    const nextReminderTime = Object.values(remindersDelayedUntil)
+      .filter((time) => time > Date.now())
+      .sort((left, right) => left - right)[0];
+
+    if (!nextReminderTime) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setNow(new Date()), nextReminderTime - Date.now());
+    return () => window.clearTimeout(timer);
+  }, [remindersDelayedUntil]);
 
   function resetForm() {
     setFormData(initialFormState);
@@ -145,6 +152,11 @@ export default function MedicationPage() {
 
   function markTakenToday(itemId: string) {
     const today = new Date().toISOString().slice(0, 10);
+    setRemindersDelayedUntil((current) => {
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
     setItems((currentItems) =>
       currentItems.map((item) =>
         item.id === itemId ? { ...item, lastTaken: today, taken: true } : item,
@@ -153,7 +165,19 @@ export default function MedicationPage() {
   }
 
   function deleteItem(itemId: string) {
+    setRemindersDelayedUntil((current) => {
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
     setItems((currentItems) => currentItems.filter((item) => item.id !== itemId));
+  }
+
+  function remindAgainLater(itemId: string) {
+    setRemindersDelayedUntil((current) => ({
+      ...current,
+      [itemId]: Date.now() + 10 * 60 * 1000,
+    }));
   }
 
   function startEdit(item: MedicationItem) {
@@ -209,6 +233,41 @@ export default function MedicationPage() {
     const cutoff = cutoffMap[item.time] ?? 24;
     return hourNow >= cutoff;
   }
+
+  function isMedicationDue(item: MedicationItem) {
+    if (isTakenToday(item)) {
+      return false;
+    }
+
+    const hourNow = now.getHours() + now.getMinutes() / 60;
+    const scheduledTimeMap: Record<string, number> = {
+      Morning: 8,
+      Afternoon: 12,
+      Evening: 18,
+      Bedtime: 21,
+    };
+    const scheduledTime = scheduledTimeMap[item.time];
+
+    return (
+      scheduledTime !== undefined &&
+      hourNow >= scheduledTime &&
+      (remindersDelayedUntil[item.id] ?? 0) <= now.getTime()
+    );
+  }
+
+  function getMedicationStatus(item: MedicationItem) {
+    if (isTakenToday(item)) {
+      return "Taken" as const;
+    }
+
+    return isOverdue(item) ? "Overdue" as const : "Due" as const;
+  }
+
+  const statusStyles = {
+    Taken: "bg-emerald-100 text-emerald-800",
+    Due: "bg-amber-100 text-amber-800",
+    Overdue: "bg-red-100 text-red-800",
+  };
 
   return (
     <main className="min-h-screen bg-[var(--background)] px-4 py-8 text-[var(--foreground)] sm:px-6 lg:px-8">
@@ -341,6 +400,42 @@ export default function MedicationPage() {
           ) : null}
         </div>
 
+        {sortedItems.some(isMedicationDue) ? (
+          <section
+            aria-label="Medication reminders"
+            className="rounded-3xl border-4 border-amber-300 bg-amber-50 p-6 shadow-sm sm:p-8"
+          >
+            <h2 className="text-3xl font-bold text-amber-950 sm:text-4xl">Medication Due</h2>
+            <div className="mt-5 space-y-4">
+              {sortedItems.filter(isMedicationDue).map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-amber-200 bg-white p-5"
+                >
+                  <p className="text-2xl font-bold text-slate-900">{item.medicationName}</p>
+                  <p className="mt-1 text-xl text-slate-700">{item.dosage}</p>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => markTakenToday(item.id)}
+                      className="rounded-2xl bg-emerald-600 px-6 py-4 text-xl font-bold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+                    >
+                      Taken
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => remindAgainLater(item.id)}
+                      className="rounded-2xl border border-amber-300 bg-white px-6 py-4 text-lg font-semibold text-amber-900 transition hover:bg-amber-100 focus:outline-none focus:ring-4 focus:ring-amber-200"
+                    >
+                      Remind me again in 10 minutes
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         <section aria-label="Medication list" className="space-y-4">
           {sortedItems.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
@@ -351,9 +446,13 @@ export default function MedicationPage() {
             </div>
           ) : (
             sortedItems.map((item) => (
+              (() => {
+                const status = getMedicationStatus(item);
+
+                return (
               <article
                 key={item.id}
-                className={`rounded-3xl border p-6 shadow-sm ${item.taken ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}
+                className={`rounded-3xl border p-6 shadow-sm ${status === "Taken" ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}
               >
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-4">
@@ -361,19 +460,11 @@ export default function MedicationPage() {
                       <p className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">
                         {item.time}
                       </p>
-                      {isTakenToday(item) ? (
-                        <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-800">
-                          <span aria-hidden>✅</span>
-                          Taken today
-                        </span>
-                      ) : null}
-                      {isOverdue(item) ? (
-                        <span className="inline-flex items-center gap-2 rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-800">
-                          Overdue
-                        </span>
-                      ) : null}
+                      <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-base font-semibold ${statusStyles[status]}`}>
+                        {status}
+                      </span>
                     </div>
-                    <h2 className={`text-2xl font-semibold ${item.taken ? "text-slate-500 line-through" : "text-slate-900"}`}>
+                    <h2 className={`text-2xl font-semibold ${status === "Taken" ? "text-slate-500 line-through" : "text-slate-900"}`}>
                       {item.medicationName}
                     </h2>
                     <p className="text-lg text-slate-700">{item.dosage}</p>
@@ -383,7 +474,7 @@ export default function MedicationPage() {
                   </div>
 
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    {isTakenToday(item) ? (
+                    {status === "Taken" ? (
                       <span className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-4 text-lg font-semibold text-white">
                         <span aria-hidden>✅</span>
                         Taken today
@@ -415,6 +506,8 @@ export default function MedicationPage() {
                   </div>
                 </div>
               </article>
+                );
+              })()
             ))
           )}
         </section>
