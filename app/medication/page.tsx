@@ -213,6 +213,11 @@ export default function MedicationPage() {
     return leftIndex - rightIndex;
   });
 
+  const medicationGroups = timeOrder.map((time) => ({
+    time,
+    items: sortedItems.filter((item) => item.time === time),
+  }));
+
   const todayString = () => new Date().toISOString().slice(0, 10);
 
   function isTakenToday(item: MedicationItem) {
@@ -436,7 +441,7 @@ export default function MedicationPage() {
           </section>
         ) : null}
 
-        <section aria-label="Medication list" className="space-y-4">
+        <section aria-label="Medication list" className="space-y-8">
           {sortedItems.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm">
               <p className="text-xl font-semibold text-slate-800">No medications added yet.</p>
@@ -445,69 +450,78 @@ export default function MedicationPage() {
               </p>
             </div>
           ) : (
-            sortedItems.map((item) => (
-              (() => {
-                const status = getMedicationStatus(item);
-
-                return (
-              <article
-                key={item.id}
-                className={`rounded-3xl border p-6 shadow-sm ${status === "Taken" ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}
-              >
-                <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <p className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">
-                        {item.time}
-                      </p>
-                      <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-base font-semibold ${statusStyles[status]}`}>
-                        {status}
-                      </span>
-                    </div>
-                    <h2 className={`text-2xl font-semibold ${status === "Taken" ? "text-slate-500 line-through" : "text-slate-900"}`}>
-                      {item.medicationName}
-                    </h2>
-                    <p className="text-lg text-slate-700">{item.dosage}</p>
-                    <p className="text-base leading-7 text-slate-600">
-                      {item.notes || "No additional notes."}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    {status === "Taken" ? (
-                      <span className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-4 text-lg font-semibold text-white">
-                        <span aria-hidden>✅</span>
-                        Taken today
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => markTakenToday(item.id)}
-                        aria-label={`Mark ${item.medicationName} as taken today`}
-                        className="rounded-2xl bg-emerald-600 px-6 py-4 text-lg font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
-                      >
-                        Taken
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => startEdit(item)}
-                      className="rounded-2xl border border-slate-300 bg-white px-6 py-4 text-lg font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-300"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteItem(item.id)}
-                      className="rounded-2xl border border-slate-300 bg-white px-6 py-4 text-lg font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-300"
-                    >
-                      Delete
-                    </button>
-                  </div>
+            medicationGroups.map(({ time, items: groupItems }) => (
+              <section key={time} aria-label={`${time} medications`} className="space-y-4">
+                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b-2 border-slate-200 pb-3">
+                  <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">{time}</h2>
+                  <p className="text-lg font-medium text-slate-600">
+                    {groupItems.length === 1 ? "1 medication" : `${groupItems.length} medications`}
+                  </p>
                 </div>
-              </article>
-                );
-              })()
+                {groupItems.length === 0 ? (
+                  <p className="py-2 text-lg text-slate-500">No medications scheduled for {time.toLowerCase()}.</p>
+                ) : (
+                  groupItems.map((item) => {
+                    const status = getMedicationStatus(item);
+
+                    return (
+                      <article
+                        key={item.id}
+                        className={`rounded-3xl border p-6 shadow-sm ${status === "Taken" ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}
+                      >
+                        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="space-y-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-base font-semibold ${statusStyles[status]}`}>
+                                {status}
+                              </span>
+                            </div>
+                            <h3 className={`text-2xl font-semibold ${status === "Taken" ? "text-slate-500 line-through" : "text-slate-900"}`}>
+                              {item.medicationName}
+                            </h3>
+                            <p className="text-lg text-slate-700">{item.dosage}</p>
+                            <p className="text-base leading-7 text-slate-600">
+                              {item.notes || "No additional notes."}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                            {status === "Taken" ? (
+                              <span className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-4 text-lg font-semibold text-white">
+                                <span aria-hidden>✅</span>
+                                Taken today
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => markTakenToday(item.id)}
+                                aria-label={`Mark ${item.medicationName} as taken today`}
+                                className="rounded-2xl bg-emerald-600 px-6 py-4 text-lg font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
+                              >
+                                Taken
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => startEdit(item)}
+                              className="rounded-2xl border border-slate-300 bg-white px-6 py-4 text-lg font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-300"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteItem(item.id)}
+                              className="rounded-2xl border border-slate-300 bg-white px-6 py-4 text-lg font-semibold text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-slate-300"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
+              </section>
             ))
           )}
         </section>

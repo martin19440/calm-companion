@@ -1,6 +1,12 @@
 {
   "family": [
     {
+      "id": "1792129042986-435eeb9829d7d8",
+      "firstName": "Jean",
+      "relationship": "Grandma",
+      "phoneNumber": "0402111401"
+    },
+    {
       "id": "1788770483023-4988873761eda8",
       "firstName": "John",
       "relationship": "Father",
@@ -8,6 +14,13 @@
     }
   ],
   "memory-book": [
+    {
+      "id": "1792113413994-981c59c093c1b",
+      "name": "Martin",
+      "relationship": "Grandfather",
+      "memory": "This is a test 16-10",
+      "photo": ""
+    },
     {
       "id": "1788770646292-cf3f816d1425f8",
       "name": "Mary",
@@ -23,11 +36,16 @@
       "dosage": "1 tablet",
       "time": "Morning",
       "notes": "",
-      "lastTaken": "2026-09-02",
+      "lastTaken": "2026-10-16",
       "taken": true
     }
   ],
   "routine": [
+    {
+      "id": "1792129142049-f515a42c10063",
+      "text": "Go to Gym",
+      "completed": false
+    },
     {
       "id": "1788826962175-28fa77acbb99d",
       "text": "Have breakfast",
